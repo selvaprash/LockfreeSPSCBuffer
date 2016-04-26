@@ -28,6 +28,7 @@ DestroyCB();
 */
 //This can be instantiated like 
 //circular_buffer_template<TSPKT_st, 4096, BufferAllocUsingNew> circular_buffer_instance;
+template <class T, unsigned int align>class BufferAllocUsingNew;
 
 template< class T, 
 		  unsigned int align, 
@@ -67,6 +68,20 @@ public:
 			return false;
 		}
 		writeptr = index + baseptr;
+		writebusy = true;
+		return true;
+	}
+	bool AquireWritePtr(std::pair<T*, int>&wrinfo) {
+		int noofTunitstowr;	
+		auto index = GetCircularBufferWriteOffset(noofTunitstowr);
+		if(index == -1)
+			return false;
+		if(writebusy) {		
+			std::cout << "you have to release the write pointer" << "\n";
+			return false;
+		}
+		wrinfo.first=index + baseptr;
+		wrinfo.second=noofTunitstowr;
 		writebusy = true;
 		return true;
 	}
@@ -127,6 +142,21 @@ private:
 		else
 			return end;
 	}
+	int GetCircularBufferWriteOffset(int& NoOfTUnitsEmpty){
+
+		int temp;
+		temp = buffered.load(std::memory_order_acquire);
+		if (temp == sizeinTUnits)
+			return -1;
+		else{
+			NoOfTUnitsEmpty = sizeinTUnits-temp; 
+			if((NoOfTUnitsEmpty + end) > sizeinTUnits){ //readoffset < writeoffset return T units upto end of buffer
+				NoOfTUnitsEmpty=sizeinTUnits-end;
+			}	
+			return end;
+		}
+
+	}		
 	void IncrementCircularBufferWriteOffset(int temp){ //temp->no of T units to advance the write pointer with.
 		end = (end + temp) % sizeinTUnits; //sizeinTUnits
 		buffered.fetch_add(temp, std::memory_order_relaxed);
@@ -136,6 +166,11 @@ private:
 		int temp;
 		//int sizetosend = 0;
 		temp = buffered.load(std::memory_order_consume);
+		if((temp + begin) > sizeinTUnits){
+
+			temp = sizeinTUnits-begin;
+
+		}	
 		return temp;
 	#if 0	
 		if ((temp != 0) || (filereadover == 1)) {

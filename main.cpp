@@ -9,6 +9,7 @@ typedef LockfreeSPSCBuffer<char, 4096, BufferAllocUsingNew> LFBUFFER;
 
 void producer(std::string infilestr, LFBUFFER& sb) {
 	char* wptr;
+	std::pair<char*, int>wrinfo;
 	std::ifstream filein;
 	filein.open(infilestr.c_str(), std::ios::binary);
 	if (!filein.is_open()) {
@@ -17,7 +18,7 @@ void producer(std::string infilestr, LFBUFFER& sb) {
 	}
 
 	while (!filein.eof()) {
-		if (sb.AquireWritePtr(wptr)) {
+		if (sb.AquireWritePtr(wrinfo)) {
 			filein.read(wptr, 1024);
 			sb.ReleaseWritePtr(filein.gcount());
 		//	std::cout << "count = " << filein.gcount() << "\n";
